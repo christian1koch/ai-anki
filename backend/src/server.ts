@@ -1,11 +1,10 @@
 import Fastify from "fastify";
 import multipartPlugin from "@fastify/multipart";
-import { Queue } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { randomUUID } from "node:crypto";
-import { error } from "node:console";
 
-const connection = new IORedis();
+const connection = new IORedis({ maxRetriesPerRequest: null });
 const app = Fastify();
 const queue = new Queue("jobs", { connection });
 
@@ -14,6 +13,21 @@ app.register(multipartPlugin);
 app.get("/health", async () => {
 	return { status: "ok" };
 });
+
+// Mock Worker
+const DEBUG_WORKER_ERROR = true;
+
+const worker = new Worker(
+	"jobs",
+	async (job) => {
+		if (DEBUG_WORKER_ERROR) {
+			throw new Error("Debug Error");
+			return;
+		}
+		return await new Promise((resolve) => setTimeout(resolve, 10000));
+	},
+	{ connection, autorun: false },
+);
 
 app.post("/jobs", async (request, reply) => {
 	const data = await request.saveRequestFiles();
@@ -34,6 +48,7 @@ app.post("/jobs", async (request, reply) => {
 	const originalFilename = data[0].filename;
 	const payload = { jobId, filePath, originalFilename };
 	await queue.add("process_pdf", payload, { jobId });
+	worker.run();
 	reply.code(202).send({ jobId, status: "queued" });
 });
 
@@ -48,14 +63,12 @@ app.get<{ Params: { jobId: string } }>(
 	"/jobs/:jobId/status",
 	async (request, reply) => {
 		const { jobId } = request.params;
-		if (!jobId) {
-			return reply.code(400).send({ error: "No job given" });
-		}
+
 		const job = await queue.getJob(jobId);
 		if (!job) {
 			return reply.code(404).send({ error: "Job Doesn't exist" });
 		}
-		const jobState = await job?.getState();
+		const jobState = await job.getState();
 		let status = JobStatus.QUEUED;
 		switch (jobState) {
 			case "active":
@@ -68,8 +81,8 @@ app.get<{ Params: { jobId: string } }>(
 				status = JobStatus.FAILED;
 				const payload = {
 					jobId,
-					jobStatus: status,
-					error: job.failedReason,
+					status,
+					error: "Sorry, the Job failed",
 				};
 				console.log(job.failedReason);
 				return reply.code(200).send(payload);
@@ -78,7 +91,8 @@ app.get<{ Params: { jobId: string } }>(
 				status = JobStatus.QUEUED;
 				break;
 		}
-		const payload = { jobId, jobStatus: status };
+		const payload = { jobId, status: status };
+
 		return reply.code(200).send(payload);
 	},
 );
