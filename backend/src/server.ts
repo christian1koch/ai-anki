@@ -38,10 +38,10 @@ app.post("/jobs", async (request, reply) => {
 });
 
 enum JobStatus {
-	QUEUED,
-	PROCESSING,
-	COMPLETED,
-	FAILED,
+	QUEUED = "queued",
+	PROCESSING = "processing",
+	COMPLETED = "completed",
+	FAILED = "failed",
 }
 
 app.get<{ Params: { jobId: string } }>(
