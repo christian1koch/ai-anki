@@ -3,6 +3,8 @@ import multipartPlugin from "@fastify/multipart";
 import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { randomUUID } from "node:crypto";
+import { PDFParse } from "pdf-parse";
+import { readFile, writeFile, rm } from "node:fs/promises";
 
 const connection = new IORedis({ maxRetriesPerRequest: null });
 const app = Fastify();
@@ -16,15 +18,26 @@ app.get("/health", async () => {
 
 // Mock Worker
 const DEBUG_WORKER_ERROR = true;
+interface PdfPayload {
+	jobId: string;
+	filePath: string;
+	originalFilename: string;
+}
 
-const worker = new Worker(
+const pdfTextExtractionWorker = new Worker<PdfPayload>(
 	"jobs",
 	async (job) => {
-		if (DEBUG_WORKER_ERROR) {
-			throw new Error("Debug Error");
-			return;
+		const pdfPath = job.data.filePath;
+		const data = await readFile(pdfPath);
+		const parser = new PDFParse({ data });
+		const result = await parser.getText();
+		if (!result) {
+			await rm(pdfPath);
+			throw new Error("Pdf is empty");
 		}
-		return await new Promise((resolve) => setTimeout(resolve, 10000));
+		console.log(result);
+		await rm(pdfPath);
+		return { jobId: job.id, textLength: result };
 	},
 	{ connection, autorun: false },
 );
@@ -44,11 +57,13 @@ app.post("/jobs", async (request, reply) => {
 		return;
 	}
 	const jobId = randomUUID();
-	const filePath = data[0].filepath;
+	const file = await readFile(data[0].filepath);
+	const filePath = `./public/uploads/${jobId}.pdf`;
+	await writeFile(filePath, file);
 	const originalFilename = data[0].filename;
 	const payload = { jobId, filePath, originalFilename };
 	await queue.add("process_pdf", payload, { jobId });
-	worker.run();
+	pdfTextExtractionWorker.run();
 	reply.code(202).send({ jobId, status: "queued" });
 });
 
