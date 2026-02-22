@@ -16,8 +16,6 @@ app.get("/health", async () => {
 	return { status: "ok" };
 });
 
-// Mock Worker
-const DEBUG_WORKER_ERROR = true;
 interface PdfPayload {
 	jobId: string;
 	filePath: string;
