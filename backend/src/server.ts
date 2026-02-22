@@ -37,7 +37,7 @@ const pdfTextExtractionWorker = new Worker<PdfPayload>(
 		}
 		console.log(result);
 		await rm(pdfPath);
-		return { jobId: job.id, textLength: result };
+		return { jobId: job.id, textLength: result.text.length };
 	},
 	{ connection, autorun: false },
 );
