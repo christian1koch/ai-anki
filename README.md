@@ -25,14 +25,16 @@ Manual flashcard creation takes too long. I want a repeatable pipeline that save
 
 ## Current MVP Progress
 
-- [x] PDF upload endpoint
-- [x] Queue-based background jobs with BullMQ + Redis
-- [x] Job status endpoint (`queued`, `processing`, `completed`, `failed`)
-- [x] Worker-based PDF text extraction
-- [x] Deterministic text chunking (sliding window)
-- [ ] OpenAI/LangChain flashcard generation
-- [ ] Flashcard formatting pass
-- [ ] Anki CSV export + download endpoint
+- [x] #1 Upload PDF and enqueue background job
+- [x] #2 Track background job status
+- [x] #3 Extract text from PDF in worker
+- [x] #4 Chunk extracted text for LLM processing
+- [ ] #5 Generate flashcards with OpenAI via LangChain
+- [ ] #6 Improve card formatting for study quality
+- [ ] #7 Export Anki-compatible CSV
+- [ ] #8 Download endpoint for completed deck
+- [ ] #9 Add retries and structured logs
+- [ ] #10 Document local dev flow end-to-end
 
 ## Current Tech Stack
 
