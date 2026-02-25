@@ -3,6 +3,8 @@ import { Worker } from "bullmq";
 import { readFile, rm } from "fs/promises";
 import { PDFParse } from "pdf-parse";
 import { chunkText, TextSplitConfig } from "./utils/chunking";
+import { createAgent } from "langchain";
+
 const connection = new IORedis({ maxRetriesPerRequest: null });
 const config: TextSplitConfig = {
 	chunkOverlap: 50,
@@ -13,6 +15,12 @@ interface PdfPayload {
 	filePath: string;
 	originalFilename: string;
 }
+
+const agent = createAgent({
+	model: "openai:gpt-5",
+	tools: [],
+});
+
 new Worker<PdfPayload>(
 	"jobs",
 	async (job) => {
